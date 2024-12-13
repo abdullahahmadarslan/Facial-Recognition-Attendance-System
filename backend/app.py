@@ -49,7 +49,7 @@ def mark_attendance():
                 WHERE student_id = %s AND DATE(timestamp) = CURRENT_DATE
             """, (student_id,))
             if cursor.fetchone()[0] > 0:
-                return jsonify({"status": "duplicate", "message": "Attendance already marked"}), 200
+                return jsonify({"status": "duplicate", "message": "Attendance already marked"}), 202
 
             # Mark attendance
             cursor.execute(
@@ -60,7 +60,7 @@ def mark_attendance():
             cursor.connection.commit()
 
             # Convert timestamp to the desired format
-            formatted_timestamp = attendance[1].strftime('%a, %d %b %Y %H:%M:%S GMT')  # Example: Fri, 29 Nov 2024 00:00:51 GMT
+            formatted_timestamp = attendance[1].strftime('%a, %d %b %Y %H:%M:%S GMT')  # format: Fri, 29 Nov 2024 00:00:51 GMT
             
             # Query to get student's name
             cursor.execute("""

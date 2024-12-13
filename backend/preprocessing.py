@@ -4,7 +4,7 @@ import numpy as np
 def process_image(face_region):
     """
     Process the given face region for further embedding generation.
-    
+
     Parameters:
     face_region: The cropped face region. Can be a NumPy array or convertible to one.
 
@@ -24,16 +24,20 @@ def process_image(face_region):
     else:
         gray_image = face_region
 
+    # Apply brightness enhancement by multiplying pixel values by 1.2
+    brightened_image = gray_image.astype(np.float32) * 1.2
+    brightened_image = np.clip(brightened_image, 0, 255).astype(np.uint8)  # Clip to valid range and convert back to uint8
+
     # Apply CLAHE for contrast enhancement
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    equalized_image = clahe.apply(gray_image)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(3, 3))
+    equalized_image = clahe.apply(brightened_image)
 
     # Apply sharpening filter
     blurred_image = cv2.GaussianBlur(equalized_image, (5, 5), 0)
     sharpened_image = cv2.addWeighted(equalized_image, 1.5, blurred_image, -0.5, 0)
-    
+
     # Save or show the processed image (optional)
-    cv2.imwrite("sharpened_image.jpg", sharpened_image)
+    cv2.imwrite("processed_image.jpg", sharpened_image)
     # cv2.imshow("Processed Image", sharpened_image)
     cv2.waitKey(1)  # Display for a short time
     cv2.destroyAllWindows()

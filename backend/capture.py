@@ -14,16 +14,16 @@ API_URL = "http://127.0.0.1:5000/mark_attendance"
 recently_marked = {}  
 
 # Load the pre-trained DNN model for face detection
-model = cv2.dnn.readNetFromCaffe(
-    "./model/deploy.prototxt",
-    "./model/res10_300x300_ssd_iter_140000.caffemodel"
+model = cv2.dnn.readNetFromCaffe( #load the pre-trained model in the Caffe format
+    "./model/deploy.prototxt", #text file defining the network's architecture (layers, operations, etc)
+    "./model/res10_300x300_ssd_iter_140000.caffemodel" # Single Shot MultiBox Detector (SSD) model weights with a ResNet-10 based backbone, specifically trained to detect faces
 )
 
-def mark_attendance(student_id,student_name):
+def mark_attendance(student_id,student_name,similarity):
     current_time = time.time()
 
     # Skip if the student was marked within the last 10 seconds
-    if student_id in recently_marked and current_time - recently_marked[student_id] < 10:
+    if student_id in recently_marked and current_time - recently_marked[student_id] < 1:
         print(f"Skipping duplicate attendance for student_id={student_id}, student_name={student_name}")
         return
 
@@ -32,9 +32,11 @@ def mark_attendance(student_id,student_name):
     try:
         response = requests.post(API_URL, json={"student_id": student_id})
         if response.status_code == 201:
-            print(f"Attendance marked successfully for student_id={student_id}, student_name={student_name}")
+            print(f"Attendance marked successfully for student_id={student_id}, student_name={student_name}, similarity= {similarity}")
+        elif response.status_code == 202:
+            print(f"Attendance already marked for student_id={student_id}, student_name={student_name}, similarity= {similarity}")
         else:
-            print(f"Error: {response.status_code}, {response.text}")
+            print(f"Error: {response.status_code}, {response.text}, similarity={similarity}")
     except Exception as e:
         print(f"Error while sending request: {e}")
 
@@ -42,7 +44,7 @@ def mark_attendance(student_id,student_name):
 
 def capture():
     # Initialize webcam capture
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0)   
 
     # Database connection
     db = Database(db_name="student_attendance", user="postgres", password="arslanbtw123")
@@ -69,15 +71,28 @@ def capture():
         # Increase scale factor for better distant face detection
         blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))  # Larger input size
         model.setInput(blob)
-        detections = model.forward()
+        detections = model.forward() 
+        # detections : all the detected faces in the current frame , 4D numpy array with the shape: (1, 1, num_detections, 7)
+        # 1, 1: Fixed dimensions for batch size.
+        # num_detections: Number of detected faces in the frame.
+        # 7: For each detection, there are 7 values:
+        # Index 0: Always 0.
+        # Index 1: Always 0.
+        # Index 2: Confidence score (probability that the detection is a face).
+        # Indexes 3-6: Bounding box coordinates:
+        # (startX, startY, endX, endY) in the range [0, 1]
 
         # Quality check variables
-        frame_height, frame_width = frame.shape[:2]
+        # frame.shape : (height, width, channels)
+        frame_height, frame_width = frame.shape[:2] #excluding 2 index i.e. channels of the frame 
         face_boxes = []
         face_center = None  # Variable to track the center of the face
 
-        for i in range(detections.shape[2]):
+        for i in range(detections.shape[2]): # detections.shape[2]: The number of detections (i.e., how many faces the model detected in the frame).
             confidence = detections[0, 0, i, 2]
+            # 0, 0: Refers to the first batch and the first class (we are using face detection, so there is only one class, "face").
+            # i: Refers to the i-th detection. Each detection corresponds to a face the model found in the frame.
+            # 2: Refers to the confidence score of that detection (the probability that the detected object is a face).
 
             # Apply a high confidence threshold to ensure it's a strong detection
             if confidence > 0.7:  # Adjusted confidence threshold
@@ -86,20 +101,23 @@ def capture():
                 (x, y, x1, y1) = box.astype("int")
                 # Increase the top and bottom boundaries to include more forehead and chin
                 # Extend boundaries to include more forehead, chin, and sides of the face
-                y = max(0, y - 20)  # Extend 20 pixels upwards for forehead
-                y1 = min(frame_height, y1 + 20)  # Extend 20 pixels downwards for chin
-                x = max(0, x - 20)  # Extend 20 pixels left for more of the face
-                x1 = min(frame_width, x1 + 20)  # Extend 20 pixels right for more of the face
+                # y = max(0, y + 20)  # Extend 20 pixels upwards for forehead
+                y1 = min(frame_height, y1 + 5)  # Extend 20 pixels downwards for chin
+                # x = max(0, x - 20)  # Extend 20 pixels left for more of the face
+                # x1 = min(frame_width, x1 + 20)  # Extend 20 pixels right for more of the face
 
                 # Calculate the area of the detected face
-                face_area = (x1 - x) * (y1 - y)
+                face_area = (x1 - x) * (y1 - y) 
+                # (x1 - x) → Width of the bounding box.
+                # (y1 - y) → Height of the bounding box.
+                # face_area is the area of the detected face.
 
                 # Quality check: Ensure the face is sufficiently large (lower the threshold for smaller faces)
                 if face_area > 0.05 * frame_width * frame_height:  # Reduced face area threshold to 5%
                     face_boxes.append((x, y, x1, y1))
 
                     # Track face center for centering check
-                    face_center = ((x + x1) // 2, (y + y1) // 2)
+                    face_center = ((x + x1) // 2, (y + y1) // 2) # (x,y) central point -> for bounded box of face
 
         # Process and crop each face
         for (x, y, x1, y1) in face_boxes:
@@ -110,7 +128,7 @@ def capture():
                 new_embedding = ToEmbeddings.get_face_embedding(preprocessed_face)  # Generate embedding
 
                 # Match embedding with stored embeddings
-                matches = match_embedding(new_embedding, stored_embeddings, threshold=0.89)
+                matches = match_embedding(new_embedding, stored_embeddings, threshold=0.92)
 
                 if matches:
                     for idx, similarity in matches:
@@ -118,18 +136,13 @@ def capture():
                         student_name = student_names[idx]
 
                         # Mark attendance for the detected student
-                        mark_attendance(student_id,student_name)
+                        mark_attendance(student_id,student_name,similarity)
                         
                         # print(f"Match found: Student ID: {student_id}, Name: {student_name}, Similarity: {similarity:.2f}")
-
-                        # # Mark attendance via API
-                        # response = requests.post(f"{API_URL}/mark_attendance", json={"student_id": student_id})
-                        # if response.status_code == 201:
-                        #     print(f"Attendance marked for {student_name}")
                 else:
                     print("No match found for this face.")
 
-        # Check if the face is mostly centered (within a region around the center of the frame)
+        # Check if the bounded box's face is mostly centered (within a region around the center of the frame)
         if face_center:
             frame_center = (frame_width // 2, frame_height // 2)
             distance_from_center = np.linalg.norm(np.array(face_center) - np.array(frame_center))

@@ -7,36 +7,50 @@ const socket = io("http://127.0.0.1:5000");
 const AttendanceDashboard = () => {
   const [attendance, setAttendance] = useState([]);
 
-    useEffect(() => {
-        // Fetch initial attendance records
-        fetch("http://127.0.0.1:5000/attendance")
-        .then((response) =>{
-            return response.json();
-        } )
-        .then((data) =>{
-            setAttendance(data)
-        } );
-        socket.on("connect", () => {
-          console.log("Connected to Socket.IO server!");
-        });
-    
+  useEffect(() => {
+    // Fetch initial attendance records
+    fetch("http://127.0.0.1:5000/attendance")
+      .then((response) => {
+        return response.json();
+      })
+      .then((data) => {
+        setAttendance(data)
+      });
+    socket.on("connect", () => {
+      console.log("Connected to Socket.IO server!");
+    });
+
 
 
   }, []);
 
-  
-    useEffect(() => {
+
+  useEffect(() => {
     // Listen for real-time updates
     socket.on("new_attendance", (record) => {
       record = record.data;
-      setAttendance((prevAttendance) => [...prevAttendance, [record.student_id, record.student_name, record.timestamp]]);
-      // console.log(record.data);
+      setAttendance((prevAttendance) => {
+        // Check if the student_id already exists in the attendance array
+        const isDuplicate = prevAttendance.some(
+          (entry) => entry[0] === record.student_id
+        );
+
+        // If it's not a duplicate, add the new record
+        if (!isDuplicate) {
+          return [...prevAttendance, [record.student_id, record.student_name, record.timestamp]];
+        }
+
+        // Otherwise, return the previous state unchanged
+        return prevAttendance;
+      });
     });
 
+    // Clean up the event listener when the component unmounts
     return () => {
       socket.off("new_attendance");
     };
-  }, []);
+  }, [socket]);
+
 
   return (
     <div style={{ padding: "20px" }}>

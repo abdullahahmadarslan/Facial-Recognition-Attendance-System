@@ -14,7 +14,7 @@ resnet_model.eval()  # Set to evaluation mode to disable dropout, batchnorm upda
 transform = transforms.Compose([
     transforms.Resize((224, 224)),  # ResNet-50 standard input size
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ResNet-50 normalization
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ResNet-50 normalization  
 ])
 
 # Define a function to get embeddings from ResNet-50 for a given face image
@@ -23,7 +23,7 @@ def get_face_embedding(face_image):
     Convert a preprocessed face image into an embedding using ResNet-50 model.
 
     Parameters:
-    face_image (numpy.ndarray or PIL.Image): The preprocessed face image in RGB format.
+    face_image (numpy.ndarray or PIL.Image): The preprocessed face image.
 
     Returns:
     numpy.ndarray: The embedding vector representing the face.
@@ -36,7 +36,7 @@ def get_face_embedding(face_image):
     face_image = face_image.convert('RGB')
     
     # Apply transformations and add batch dimension
-    face_tensor = transform(face_image).unsqueeze(0)  # Add batch dimension
+    face_tensor = transform(face_image).unsqueeze(0)  #apply transformation and add batch dimension
 
     # Get embeddings without computing gradients
     with torch.no_grad():
