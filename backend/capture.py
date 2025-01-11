@@ -15,8 +15,8 @@ recently_marked = {}
 
 # Load the pre-trained DNN model for face detection
 model = cv2.dnn.readNetFromCaffe( #load the pre-trained model in the Caffe format
-    "./model/deploy.prototxt", #text file defining the network's architecture (layers, operations, etc)
-    "./model/res10_300x300_ssd_iter_140000.caffemodel" # Single Shot MultiBox Detector (SSD) model weights with a ResNet-10 based backbone, specifically trained to detect faces
+    "./DNN/deploy.prototxt", #text file defining the network's architecture (layers, operations, etc)
+    "./DNN/res10_300x300_ssd_iter_140000.caffemodel" # Single Shot MultiBox Detector (SSD) model weights with a ResNet-10 based backbone, specifically trained to detect faces
 )
 
 def mark_attendance(student_id,student_name,similarity):
